@@ -11,8 +11,13 @@ class Play extends Phaser.Scene {
         this.load.image('score', '././assets/stars.png');
 
         //load sprites
+        this.load.image('cartFull', '././assets/cartFull.png');
+        this.load.image('cartMed', '././assets/cartMed.png');
+        this.load.image('cartLow', '././assets/cartLow.png');
         this.load.image('cart', '././assets/cartFull.png');
-        this.load.image('avatar', '././assets/avatar.png');
+        this.load.image('avatar', '././assets/hand.png');
+        this.load.image('human', '././assets/human.png');
+        
 
         this.load.image('topping1', '././assets/topping1.png');
         this.load.image('topping2', '././assets/topping2.png');
@@ -42,18 +47,21 @@ class Play extends Phaser.Scene {
     create(){
         // place tile sprite
         this.bg = this.add.tileSprite(0, 0, 555, 360, 'bg').setOrigin(0, 0);
-        this.meter = this.add.tileSprite(0, 0, 20, 5, 'meter').setOrigin(0, 0);
-        this.score = this.add.tileSprite(0, 0, 50, 50, 'score').setOrigin(0, 0);
-        this.cartVechicle = this.add.tileSprite(-10,game.config.height-200, 600, 330, 'cart').setScale(0.5, 0.5).setOrigin(0, 0);
+        this.meter = this.add.tileSprite(160, 0, 20, 5, 'meter').setOrigin(0, 0);
+        //this.score = this.add.image(0, 0, 'score').setOrigin(0, 0);
+        this.cartVechicle = this.add.tileSprite(-10,game.config.height-200, 1600, 950, 'cart').setScale(0.2, 0.2).setOrigin(0, 0);
         // add objs
+        this.popUpImg = new PopUp(this, 100,100, 'meterCompleted').setScale(0.5, 0.5).setOrigin(0, 0);
         this.ingredient1 = new Ingredient(this, game.config.width + 192, game.config.height-200, 'ingredient1', 0, 30).setScale(0.5, 0.5).setOrigin(0,0);
         this.ingredient1.pos = 2;
         this.ingredient2 = new Ingredient(this, game.config.width + 300, game.config.height-150, 'ingredient2', 0, 30).setScale(0.5, 0.5).setOrigin(0,0);
         this.ingredient2.pos = 1;
         this.ingredient3 = new Ingredient(this, game.config.width, game.config.height-100, 'ingredient3', 0, 30).setScale(0.5, 0.5).setOrigin(0,0);
         this.ingredient3.pos = 0;
+        //add human
+        this.human = new Human(this, game.config.width, game.config.height-150, 'human', 0, 30).setScale(0.25, 0.25).setOrigin(0,0);
         //add cart
-        this.cart = new Cart(this, 150,game.config.height-200, 'avatar').setScale(0.5, 0.5).setOrigin(0, 0);
+        this.cart = new Cart(this, 150,game.config.height-150, 'avatar').setScale(0.5, 0.5).setOrigin(0, 0);
         // define keys
         keyUP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
         keyDOWN = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
@@ -64,9 +72,8 @@ class Play extends Phaser.Scene {
             frames: this.anims.generateFrameNumbers('death', { start: 0, end: 9, first: 0}),
             frameRate: 30
         });*/
-        // score & cash
-        this.score = 0;
-        this.cash = 0;
+        //used to determine when ingredients and humans are caught
+        this.catchZone = 150;
         
         // ui display
         let uiConfig = {
@@ -82,7 +89,10 @@ class Play extends Phaser.Scene {
                 bottom: 5,
             },
         }
-        this.cash = this.add.text(550, 54, "cash:" + this.cash , uiConfig);
+        this.cashUI = this.add.text(550, 54, 'cash: $'+ game.cash + '.00', uiConfig);
+        this.instructionUI = this.add.text(100, 70, 'catch broth!', uiConfig);
+        this.ingredientUI = this.add.image(200, 10, game.settings.recipeBroth).setScale(0.5, 0.5).setOrigin(0, 0);
+        this.progUITxt = this.add.text(0, 0, 'Progress:', uiConfig);
         
         // game over flag
         this.gameOver = false;
@@ -132,7 +142,7 @@ class Play extends Phaser.Scene {
         }
         if(this.checkCatch(this.cart, this.ingredient3)) {
         }
-
+        this.checkHit(this.cart,this.human);
         if(this.ingredient1.x == game.config.width){
             this.changeTexture(this.ingredient1);
         }
@@ -158,29 +168,40 @@ class Play extends Phaser.Scene {
         this.ingredient1.update();
         this.ingredient2.update();
         this.ingredient3.update();
+        this.human.update();
+        this.popUpImg.update();
         
     }
 
     changeIngredientChances(){
         if(this.ingredientPhase == 0){
+            this.getNewOrder();
+            this.ingredientUI.setTexture(game.settings.recipeBroth);
+            this.instructionUI.text = 'catch broth!';
+            this.meter.width = 20;
             game.settings.brothChance = 0.8;
             game.settings.noodleChance = 0.1;
             game.settings.toppingChance = 0.1;
+            this.ingredientPhase++;
         } else if(this.ingredientPhase == 1){
             game.settings.brothChance = 0.1;
             game.settings.noodleChance = 0.8;
             game.settings.toppingChance = 0.1;
+            this.ingredientPhase++;
         } else if(this.ingredientPhase == 2){
             game.settings.brothChance = 0.1;
             game.settings.noodleChance = 0.1;
             game.settings.toppingChance = 0.8;
+            this.ingredientPhase++;
         } else{
             this.ingredient1.alpha = 0;
             this.ingredient2.alpha = 0;
             this.ingredient3.alpha = 0;
+            this.popUpTxt(200,20, '$'+this.calcCash()+'.00');
+            this.cashUI.text = 'cash: $'+ game.cash + '.00';
+
             this.ingredientPhase = 0;
         }
-        this.ingredientPhase++;
 
     }
 
@@ -205,9 +226,34 @@ class Play extends Phaser.Scene {
         
     }
 
+
+    checkHit(cart,human){
+        if (cart.pos != 1 && human.x <= this.catchZone){
+            if(human.alpha !=0){
+                game.cartHealth--;
+            }
+            this.cameras.main.shake(20,0.005);
+            human.alpha = 0;
+            //alter cart based on health
+            if(game.cartHealth<=0){
+                //send to market of car is broken
+                this.scene.start("marketScene");
+            }else if(game.cartHealth < game.settings.maxHealth/2){
+                this.cartVechicle.setTexture('cartLow');
+            }else if(game.cartHealth < game.settings.maxHealth){
+                this.cartVechicle.setTexture('cartMed');
+            } else if(this.cartVechicle.texture.key != 'cartFull'){
+                //restore to full if necesary
+                this.cartVechicle.setTexture('cartFull');
+            }
+        } else if(human.x <= this.catchZone){
+            human.alpha = 0;
+        }
+    }
+
     checkCatch(cart, obj) {
         // simple AABB checking
-        if (cart.pos == obj.pos && obj.x <= cart.width && obj.x >= cart.width-20 ) {
+        if (cart.pos == obj.pos && obj.x <= this.catchZone && obj.x >= this.catchZone-50 ) {
             if(obj.texture.key == game.settings.recipeBroth){
                 if(game.brothProg < game.maxProg){
                     if(obj.alpha !=0){
@@ -216,7 +262,9 @@ class Play extends Phaser.Scene {
                         obj.alpha = 0;
                     }
                 } else {
-                    this.meterCompleted = this.add.sprite(100, 0, 555, 360, 'meterCompleted').setOrigin(0, 0);
+                    this.ingredientUI.setTexture(game.settings.recipeNoodle);
+                    this.instructionUI.text = 'catch noodles!';
+                    this.popUpImg = new PopUp(this, 100,100, 'meterCompleted').setScale(0.5, 0.5).setOrigin(0, 0);
                     this.meter.width = 20;
                     game.extras++;
                 }
@@ -229,8 +277,12 @@ class Play extends Phaser.Scene {
                         obj.alpha = 0;
                     }
                 } else {
-                    this.meterCompleted = this.add.sprite(100, 0, 555, 360, 'meterCompleted').setOrigin(0, 0);
+                    this.ingredientUI.setTexture(game.settings.recipeTopping);
+                    this.instructionUI.text = 'catch toppings!';
+                    
+                    this.popUpImage('meterCompleted',100,100);
                     this.meter.width = 20;
+                    game.extras++;
 
                 }
             }
@@ -242,8 +294,11 @@ class Play extends Phaser.Scene {
                         obj.alpha = 0;
                     }
                 } else {
-                    this.meterCompleted = this.add.sprite(100, 0, 555, 360, 'meterCompleted').setOrigin(0, 0);
+                    this.ingredientUI.alpha = 0;
+                    this.instructionUI.text = 'deliver the ramen!';
+                    this.popUpImage('meterCompleted',100,100);
                     this.meter.width = 20;
+                    game.extras++;
                 }
 
             }else{
@@ -255,6 +310,46 @@ class Play extends Phaser.Scene {
         }
     }
 
+    getNewOrder(){
+        game.brothProg = 0;
+        game.noodleProg = 0;
+        game.toppingProg = 0;
+        game.settings.recipeBroth = Phaser.Math.RND.pick(game.broths);
+        game.settings.recipeNoodle = Phaser.Math.RND.pick(game.noodles);
+        game.settings.recipeTopping = Phaser.Math.RND.pick(game.toppings);
+        console.log('Order Recieved: ' + game.settings.recipeBroth + ' with ' + game.settings.recipeNoodle + ' and ' + game.settings.recipeTopping);
+    }
+
+    popUpImage(img,x,y){
+        var image = this.add.image(x, y, img).setOrigin(0, 0);
+        this.clock = this.time.delayedCall(500, () => {
+            image.destroy();
+        }, null, this);
+    }
+
+    popUpTxt(txt,x,y){
+        var txt = this.add.text(x, y, txt).setOrigin(0, 0);
+        this.clock = this.time.delayedCall(500, () => {
+            txt.destroy();
+        }, null, this);
+    }
+
+    calcCash(){
+        var totalProg = game.brothProg + game.noodleProg + game.toppingProg;
+        var payment = 5;
+        if(totalProg < 3){
+            payment = 0;
+        } else if(totalProg < 5){
+            payment = 2;
+        } else if(game.extras>0){
+            payment++;
+        }
+        if(game.extras>3){
+            payment + 2;
+        }
+        game.cash += payment;
+        return payment;
+    }
     /*
     onDestroyed(obj) {
         obj.alpha = 0;                         // temporarily hide obj
