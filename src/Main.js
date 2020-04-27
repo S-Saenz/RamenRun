@@ -25,8 +25,8 @@ game.mistakes = 0;
 game.extras = 0;
 
 game.settings = {
-    maxHealth: 1,
-    timer: 1000, 
+    maxHealth: 3,
+    timer: 10000, 
     panSpeed: 4,
     brothChance: .8,
     noodleChance: .1,
